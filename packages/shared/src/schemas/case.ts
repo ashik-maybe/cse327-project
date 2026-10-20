@@ -1,1 +1,3 @@
-import { z } from 'zod'; export const caseSchema = z.object({ id: z.string().optional() });
+import { z } from "zod";
+export const createCaseSchema = z.object({ clientId: z.string().optional(), summary: z.string(), description: z.string().optional(), category: z.enum(["shelter","protection","food","wash","health","other"]), urgency: z.enum(["low","medium","high","critical"]), status: z.enum(["new","in_progress","referred","resolved"]).optional(), locationName: z.string().optional(), latitude: z.number().optional(), longitude: z.number().optional(), nextContact: z.string().optional(), source: z.enum(["manual","voice"]).optional(), aiAssisted: z.boolean().optional(), aiSource: z.string().optional(), clientCreatedAt: z.string().optional() });
+export const updateCaseSchema = createCaseSchema.partial();
