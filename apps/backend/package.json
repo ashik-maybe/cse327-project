@@ -3,13 +3,22 @@
   "version": "1.0.50",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run --watch src/index.ts"
+    "dev": "bun run --watch src/index.ts",
+    "db:generate": "drizzle-kit generate --config drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
+    "db:seed": "bun run src/db/seed.ts"
   },
   "dependencies": {
-    "elysia": "latest"
+    "elysia": "latest",
+    "drizzle-orm": "^0.40.0",
+    "postgres": "^3.4.0",
+    "bcryptjs": "^2.4.3",
+    "@elysiajs/cookie": "latest"
   },
   "devDependencies": {
-    "bun-types": "latest"
+    "bun-types": "latest",
+    "drizzle-kit": "^0.22.0",
+    "@types/bcryptjs": "^2.4.0"
   },
   "module": "src/index.js"
 }
