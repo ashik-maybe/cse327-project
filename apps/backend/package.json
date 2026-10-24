@@ -11,11 +11,14 @@
   "dependencies": {
     "elysia": "latest",
     "drizzle-orm": "^0.40.0",
-    "postgres": "^3.4.0"
+    "postgres": "^3.4.0",
+    "bcryptjs": "^2.4.3",
+    "@elysiajs/cookie": "latest"
   },
   "devDependencies": {
     "bun-types": "latest",
-    "drizzle-kit": "^0.22.0"
+    "drizzle-kit": "^0.22.0",
+    "@types/bcryptjs": "^2.4.0"
   },
   "module": "src/index.js"
 }
