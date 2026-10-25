@@ -1,5 +1,5 @@
 import { dbClient } from "../db/client";
-import { cases } from "../db/schema";
+import { cases, caseNotes, users } from "../db/schema";
 import { eq, and, or, ilike } from "drizzle-orm";
 import * as schemas from "@campbridge/shared";
 
@@ -16,7 +16,7 @@ export async function listCases(filters: {
   userId?: string;
   userRole?: string;
 }) {
-  const { status, urgency, category, assignedTo, createdBy, q, page = 1, limit = 20 } = filters;
+  const { scope, status, urgency, category, assignedTo, createdBy, q, page = 1, limit = 20, userId, userRole } = filters;
   const conditions = [];
 
   if (status) conditions.push(eq(cases.status, status));
@@ -24,6 +24,12 @@ export async function listCases(filters: {
   if (category) conditions.push(eq(cases.category, category));
   if (assignedTo) conditions.push(eq(cases.assignedTo, assignedTo));
   if (createdBy) conditions.push(eq(cases.createdBy, createdBy));
+
+  // Role-based visibility
+  if (scope === "mine" || userRole === "volunteer") {
+    conditions.push(or(eq(cases.createdBy, userId!), eq(cases.assignedTo, userId!)));
+  }
+  // scope === "team" or team_lead sees all
 
   if (q) {
     conditions.push(or(ilike(cases.summary, `%${q}%`), ilike(cases.description, `%${q}%`)));
@@ -90,4 +96,26 @@ export async function updateCase(id: string, input: Partial<schemas.CreateCaseIn
     .where(eq(cases.id, id))
     .returning();
   return updated ?? null;
+}
+
+export async function addCaseNote(caseId: string, userId: string, note: string) {
+  const [noteRecord] = await dbClient
+    .insert(caseNotes)
+    .values({ caseId, userId, note })
+    .returning();
+  return noteRecord ?? null;
+}
+
+export async function listCaseNotes(caseId: string) {
+  return await dbClient
+    .select({ 
+      note: caseNotes.note, 
+      createdAt: caseNotes.createdAt, 
+      userName: users.name,
+      userId: caseNotes.userId 
+    })
+    .from(caseNotes)
+    .leftJoin(users, eq(caseNotes.userId, users.id))
+    .where(eq(caseNotes.caseId, caseId))
+    .orderBy(caseNotes.createdAt.desc());
 }
