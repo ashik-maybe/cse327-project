@@ -126,28 +126,43 @@ export const casesApi = {
   addNote: (id: string, note: string) => post(`/cases/${id}/notes`, { note }),
 }
 
-export type DashboardVolunteer = {
-  role: "volunteer"
-  highUrgencyCount: number
-  staleCaseCount: number
-  assignedToMeCount: number
-  recentCaseCount: number
-  safetyReportCount: number
+export type SafetyRecord = {
+  id: string
+  incidentType: "threat" | "harassment" | "other"
+  anonymizedDescription: string
+  originalDescription?: string | null
+  storeOriginal: boolean
+  approximateLocation?: string | null
+  urgency: "low" | "medium" | "high" | "critical"
+  status: "new" | "acknowledged" | "resolved"
+  createdAt: string
+  createdBy?: string | null
 }
-
-export type DashboardLead = {
-  role: "team_lead"
-  highUrgencyCount: number
-  staleCaseCount: number
-  unassignedCount: number
-  recentSafetyCount: number
-}
-
-export type DashboardSummary = DashboardVolunteer | DashboardLead
 
 export const dashboardApi = {
   summary: () => get<DashboardSummary>("/dashboard/summary"),
 }
 
-// AI endpoints get a longer budget than normal CRUD.
-export const AI_TIMEOUT_MS = 15000
+export const safetyApi = {
+  list: (params?: Record<string, string | number | undefined>) => {
+    const qs = new URLSearchParams()
+    for (const [k, v] of Object.entries(params ?? {})) {
+      if (v !== undefined && v !== "") qs.set(k, String(v))
+    }
+    const suffix = qs.toString() ? `?${qs}` : ""
+    return get<Paginated<SafetyRecord>>(`/safety${suffix}`)
+  },
+  get: (id: string) => get<SafetyRecord>(`/safety/${id}`),
+  create: (input: {
+    incidentType: SafetyRecord["incidentType"]
+    anonymizedDescription: string
+    originalDescription?: string
+    storeOriginal?: boolean
+    approximateLocation?: string
+    urgency: SafetyRecord["urgency"]
+  }) => post<SafetyRecord>("/safety", input),
+  updateStatus: (id: string, status: SafetyRecord["status"]) => patch<SafetyRecord>(`/safety/${id}`, { status }),
+}
+
+export type { SafetyRecord } from "@campbridge/shared"
+
