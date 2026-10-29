@@ -3,7 +3,7 @@
 import { useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import type { z } from "zod"
@@ -46,6 +46,8 @@ export default function NewCasePage() {
       aiAssisted: false,
     },
   })
+  const category = useWatch({ control: form.control, name: "category" })
+  const urgency = useWatch({ control: form.control, name: "urgency" })
 
   const create = useMutation({
     mutationFn: (values: CaseValues) =>
@@ -121,7 +123,7 @@ export default function NewCasePage() {
               <div className="space-y-1.5">
                 <Label htmlFor="category">Category</Label>
                 <Select
-                  value={form.watch("category")}
+                  value={category}
                   onValueChange={(value) => form.setValue("category", value as CaseValues["category"], { shouldValidate: true })}
                 >
                   <SelectTrigger id="category" className="w-full">
@@ -141,7 +143,7 @@ export default function NewCasePage() {
               <div className="space-y-1.5">
                 <Label htmlFor="urgency">Urgency</Label>
                 <Select
-                  value={form.watch("urgency")}
+                  value={urgency}
                   onValueChange={(value) => form.setValue("urgency", value as CaseValues["urgency"], { shouldValidate: true })}
                 >
                   <SelectTrigger id="urgency" className="w-full">

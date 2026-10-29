@@ -13,7 +13,7 @@ import {
   ArrowRight,
 } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { EmptyState, ErrorState, LoadingState } from "@/components/states"
 import { useAuth } from "@/lib/auth"
 import { dashboardApi } from "@/lib/api"
