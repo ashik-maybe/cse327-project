@@ -1,60 +1,31 @@
-import { Elysia } from "elysia";
-import { listCases, createCase, getCase, updateCase, addCaseNote, listCaseNotes } from "../services/case.service";
-import { z } from "zod";
-import { createCaseSchema, updateCaseSchema, listCasesSchema } from "@campbridge/shared";
-import { requireRole } from "../middleware/role";
-import { authMiddleware } from "../middleware/auth";
+import { Elysia, t } from "elysia";
+import { createCaseSchema, updateCaseSchema } from "@campbridge/shared";
+import { addCaseNote, createCase, getCase, listCaseNotes, listCases, updateCase } from "../services/case.service";
+import { requireUser } from "../middleware/role";
+
+const query = t.Object({
+  status: t.Optional(t.String()),
+  urgency: t.Optional(t.String()),
+  category: t.Optional(t.String()),
+  assignedTo: t.Optional(t.String()),
+  createdBy: t.Optional(t.String()),
+  q: t.Optional(t.String()),
+  page: t.Optional(t.Numeric({ minimum: 1 })),
+  limit: t.Optional(t.Numeric({ minimum: 1, maximum: 100 })),
+});
 
 export const casesRoute = new Elysia({ prefix: "/api/cases" })
-  .use(authMiddleware)
-  .get("/", async ({ query }: any) => {
-    const filters = {
-      scope: query.scope as "mine" | "team" | undefined,
-      status: query.status,
-      urgency: query.urgency,
-      category: query.category,
-      assignedTo: query.assignedTo,
-      createdBy: query.createdBy,
-      q: query.q,
-      page: parseInt(query.page as string) || 1,
-      limit: parseInt(query.limit as string) || 20,
-      userId: query.userId,
-      userRole: query.role,
-    };
-    return await listCases(filters);
-  }, {
-    params: z.object({
-      page: z.number().min(1).optional(),
-      limit: z.number().min(1).optional(),
-      scope: z.enum(["mine", "team"]).optional(),
-      status: z.string().optional(),
-      urgency: z.string().optional(),
-      category: z.string().optional(),
-      assignedTo: z.string().optional(),
-      createdBy: z.string().optional(),
-      q: z.string().optional(),
-      limit: z.number().min(1).optional(),
-    })
+  .get("/", ({ query, user }: any) => {
+    const current = requireUser(user);
+    return listCases(query, current);
+  }, { query })
+  .post("/", ({ body, user }: any) => {
+    const current = requireUser(user);
+    return createCase(createCaseSchema.parse(body), current.id);
+  }, { body: t.Any() })
+  .get("/:id", ({ params, user }: any) => getCase(params.id, requireUser(user)))
+  .patch("/:id", ({ body, params, user }: any) => updateCase(params.id, updateCaseSchema.parse(body), requireUser(user)), { body: t.Any() })
+  .post("/:id/notes", ({ body, params, user }: any) => addCaseNote(params.id, requireUser(user), body.note), {
+    body: t.Object({ note: t.String({ minLength: 1 }) }),
   })
-  .post("/", async ({ body, userId }: any) => {
-    const input = body as typeof createCaseSchema;
-    return await createCase(input, userId);
-  }, {
-    body: createCaseSchema,
-  })
-  .get("/:id", async ({ params }: any) => {
-    return await getCase(params.id);
-  })
-  .patch("/:id", async ({ body, params, userId }: any) => {
-    const input = body as typeof updateCaseSchema;
-    return await updateCase(params.id, input);
-  }, {
-    body: updateCaseSchema,
-  })
-  .post("/:id/notes", async ({ body, params, userId }: any) => {
-    const note = await addCaseNote(params.id, userId, body.note);
-    return note;
-  })
-  .get("/:id/notes", async ({ params }: any) => {
-    return await listCaseNotes(params.id);
-  });
+  .get("/:id/notes", ({ params, user }: any) => listCaseNotes(params.id, requireUser(user)));

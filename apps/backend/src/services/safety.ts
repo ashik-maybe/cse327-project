@@ -1,80 +1,36 @@
-import { dbClient } from "../db/client"
-import { safetyReports } from "../db/schema"
-import { eq } from "drizzle-orm"
+import { and, count, desc, eq } from "drizzle-orm";
+import { dbClient } from "../db/client";
+import { safetyReports } from "../db/schema";
 
-export type SafetyReport = {
-  id: string
-  incidentType: string
-  anonymizedDescription: string
-  originalDescription?: string
-  storeOriginal: boolean
-  approximateLocation?: string
-  urgency: string
-  status: string
-  createdAt: string
-  createdBy?: string
+type User = { id: string; role: string };
+
+export async function listSafetyReports(filters: { status?: string; urgency?: string; page?: number; limit?: number }, user: User) {
+  const { status, urgency, page = 1, limit = 20 } = filters;
+  const visibility = user.role === "team_lead" ? undefined : eq(safetyReports.createdBy, user.id);
+  const where = and(
+    visibility,
+    status ? eq(safetyReports.status, status as typeof safetyReports.status.enumValues[number]) : undefined,
+    urgency ? eq(safetyReports.urgency, urgency as typeof safetyReports.urgency.enumValues[number]) : undefined
+  );
+  const [{ total }] = await dbClient.select({ total: count() }).from(safetyReports).where(where);
+  const items = await dbClient.select().from(safetyReports).where(where).orderBy(desc(safetyReports.createdAt)).limit(limit).offset((page - 1) * limit);
+  return { items, total: Number(total), page, limit };
 }
 
-export async function listSafetyReports(filters: { 
-  status?: string 
-  urgency?: string 
-  createdBy?: string 
-  page?: number 
-  limit?: number 
-}) {
-  const { status, urgency, createdBy, page = 1, limit = 20 } = filters
-  const conditions = []
-  if (status) conditions.push(eq(safetyReports.status, status))
-  if (urgency) conditions.push(eq(safetyReports.urgency, urgency))
-  if (createdBy) conditions.push(eq(safetyReports.createdBy, createdBy))
-
-  const total = await dbClient.select({ count: safetyReports.id }).from(safetyReports).where(eq(safetyReports.id, undefined)).execute()
-  const items = await dbClient
-    .select()
-    .from(safetyReports)
-    .orderBy(safetyReports.createdAt.desc())
-    .limit(limit)
-    .offset((page - 1) * limit)
-    .execute()
-
-  return { items, total: items.length }
+export async function createSafetyReport(input: typeof safetyReports.$inferInsert, userId: string) {
+  const [record] = await dbClient.insert(safetyReports).values({ ...input, createdBy: userId }).returning();
+  return record;
 }
 
-export async function createSafetyReport(input: {
-  incidentType: string
-  anonymizedDescription: string
-  originalDescription?: string
-  storeOriginal: boolean
-  approximateLocation?: string
-  urgency: string
-}) {
-  return await dbClient
-    .insert(safetyReports)
-    .values({
-      incidentType: input.incidentType,
-      anonymizedDescription: input.anonymizedDescription,
-      originalDescription: input.originalDescription,
-      storeOriginal: input.storeOriginal,
-      approximateLocation: input.approximateLocation,
-      urgency: input.urgency,
-      status: "new",
-    })
-    .returning()
+export async function getSafetyReport(id: string, user: User) {
+  const [record] = await dbClient.select().from(safetyReports).where(eq(safetyReports.id, id)).limit(1);
+  if (!record) return null;
+  if (user.role !== "team_lead" && record.createdBy !== user.id) throw new Error("FORBIDDEN");
+  return record;
 }
 
-export async function getSafetyReport(id: string) {
-  const [report] = await dbClient
-    .select()
-    .from(safetyReports)
-    .where(eq(safetyReports.id, id))
-    .limit(1)
-  return report ?? null
-}
-
-export async function updateSafetyReportStatus(id: string, status: string) {
-  return await dbClient
-    .update(safetyReports)
-    .set({ status })
-    .where(eq(safetyReports.id, id))
-    .returning()
+export async function updateSafetyReportStatus(id: string, status: "new" | "acknowledged" | "resolved", user: User) {
+  if (user.role !== "team_lead") throw new Error("FORBIDDEN");
+  const [record] = await dbClient.update(safetyReports).set({ status }).where(eq(safetyReports.id, id)).returning();
+  return record ?? null;
 }

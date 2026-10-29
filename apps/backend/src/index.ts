@@ -1,1 +1,5 @@
-import { app } from "./app"; app.listen(4000);
+import { app } from "./app";
+import { env } from "./env";
+
+app.listen(env.port);
+console.log(`CampBridge API listening on ${env.port}`);

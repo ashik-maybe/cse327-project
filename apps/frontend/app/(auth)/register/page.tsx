@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation } from "@tanstack/react-query"
 import { z } from "zod"
@@ -40,6 +40,7 @@ export default function RegisterPage() {
     resolver: zodResolver(registerFormSchema),
     defaultValues: { name: "", email: "", password: "", confirmPassword: "", role: "volunteer" },
   })
+  const role = useWatch({ control: form.control, name: "role" })
 
   const register = useMutation({
     mutationFn: (values: RegisterValues) =>
@@ -93,7 +94,7 @@ export default function RegisterPage() {
 
             <div className="space-y-1.5">
               <Label htmlFor="role">Role</Label>
-              <Select value={form.watch("role")} onValueChange={(value) => form.setValue("role", value as RegisterValues["role"])}>
+              <Select value={role} onValueChange={(value) => form.setValue("role", value as RegisterValues["role"])}>
                 <SelectTrigger id="role" className="w-full">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>

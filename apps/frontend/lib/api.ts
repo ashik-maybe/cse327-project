@@ -1,4 +1,4 @@
-import type { CreateCaseInput } from "@campbridge/shared"
+import type { CreateCaseInput, DashboardSummary, SafetyRecord, ServicePointRecord } from "@campbridge/shared"
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api"
 
@@ -39,7 +39,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
       credentials: "include",
       signal: controller.signal,
     })
-  } catch (err) {
+  } catch {
     if (controller.signal.aborted) {
       throw new ApiError("Request timed out", "TIMEOUT", 408)
     }
@@ -126,19 +126,6 @@ export const casesApi = {
   addNote: (id: string, note: string) => post(`/cases/${id}/notes`, { note }),
 }
 
-export type SafetyRecord = {
-  id: string
-  incidentType: "threat" | "harassment" | "other"
-  anonymizedDescription: string
-  originalDescription?: string | null
-  storeOriginal: boolean
-  approximateLocation?: string | null
-  urgency: "low" | "medium" | "high" | "critical"
-  status: "new" | "acknowledged" | "resolved"
-  createdAt: string
-  createdBy?: string | null
-}
-
 export const dashboardApi = {
   summary: () => get<DashboardSummary>("/dashboard/summary"),
 }
@@ -164,5 +151,8 @@ export const safetyApi = {
   updateStatus: (id: string, status: SafetyRecord["status"]) => patch<SafetyRecord>(`/safety/${id}`, { status }),
 }
 
-export type { SafetyRecord } from "@campbridge/shared"
+export const servicePointsApi = {
+  list: () => get<ServicePointRecord[]>("/service-points"),
+}
 
+export type { DashboardSummary, SafetyRecord, ServicePointRecord } from "@campbridge/shared"

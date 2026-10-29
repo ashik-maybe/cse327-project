@@ -1,9 +1,9 @@
-import { Geist, Geist_Mono, IBM_Plex_Sans, Source_Sans_3 } from "next/font/google"
+import { Geist_Mono, IBM_Plex_Sans, Source_Sans_3 } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Providers } from "@/lib/providers"
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
 const sourceSans3Heading = Source_Sans_3({subsets:['latin'],variable:'--font-heading'});
 
