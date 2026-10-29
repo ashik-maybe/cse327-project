@@ -1,7 +1,7 @@
-import { drizzle } from "drizzle-orm/postgres";
-import { Client } from "postgres";
+import postgres from "postgres";
+import { drizzle } from "drizzle-orm/postgres-js";
 import * as schema from "./schema";
 
-const client = new Client({ connectionString: process.env.DATABASE_URL || "postgres://campbridge:campbridge@localhost:5432/campbridge" });
-await client.connect();
+const databaseUrl = process.env.DATABASE_URL ?? "postgres://campbridge:campbridge@localhost:5432/campbridge";
+const client = postgres(databaseUrl);
 export const dbClient = drizzle(client, { schema });

@@ -1,47 +1,30 @@
-import { Elysia } from "elysia"
-import { safetyApi } from "../services/safety"
-import { z } from "zod"
-import { safetyApi } from "../services/safety"
-import { requireRole } from "../middleware/role"
-import { authMiddleware } from "../middleware/auth"
-
-const safetySchema = z.object({
-  incidentType: z.enum(["threat", "harassment", "other"]),
-  anonymizedDescription: z.string(),
-  originalDescription: z.string().optional(),
-  storeOriginal: z.boolean().optional(),
-  approximateLocation: z.string().optional(),
-  urgency: z.enum(["low", "medium", "high", "critical"]),
-})
+import { Elysia, t } from "elysia";
+import { createSafetySchema, updateSafetySchema } from "@campbridge/shared";
+import { requireUser } from "../middleware/role";
+import { createSafetyReport, getSafetyReport, listSafetyReports, updateSafetyReportStatus } from "../services/safety";
 
 export const safetyRoute = new Elysia({ prefix: "/api/safety" })
-  .use(authMiddleware)
-  .get("/", async ({ query }: any) => {
-    const filters = {
-      status: query.status,
-      urgency: query.urgency,
-      createdBy: query.createdBy,
-      page: parseInt(query.page as string) || 1,
-      limit: parseInt(query.limit as string) || 20,
-    }
-    return await safetyApi.listSafetyReports(filters)
-  }, {
-    params: z.object({
-      page: z.number().min(1).optional(),
-      limit: z.number().min(1).optional(),
-      status: z.string().optional(),
-      urgency: z.string().optional(),
-      createdBy: z.string().optional(),
-    })
+  .get("/", ({ query, user }: any) => listSafetyReports(query, requireUser(user)), {
+    query: t.Object({
+      status: t.Optional(t.String()),
+      urgency: t.Optional(t.String()),
+      page: t.Optional(t.Numeric({ minimum: 1 })),
+      limit: t.Optional(t.Numeric({ minimum: 1, maximum: 100 })),
+    }),
   })
-  .post("/", async ({ body }: any) => {
-    const input = safetySchema.parse(body)
-    return await safetyApi.createSafetyReport(input)
-  }, { body: safetySchema })
-  .get("/:id", async ({ params }: any) => {
-    return await safetyApi.getSafetyReport(params.id)
-  })
-  .patch("/:id", async ({ params, body }: any) => {
-    const input = safetySchema.partial().parse(body)
-    return await safetyApi.updateSafetyReportStatus(params.id, input.status)
-  })
+  .post("/", ({ body, user }: any) => {
+    const input = createSafetySchema.parse(body);
+    return createSafetyReport({
+      incidentType: input.incidentType,
+      anonymizedDescription: input.anonymizedDescription,
+      originalDescription: input.storeOriginal ? input.originalDescription : undefined,
+      storeOriginal: input.storeOriginal ?? false,
+      approximateLocation: input.approximateLocation,
+      urgency: input.urgency,
+      occurredAt: input.occurredAt ? new Date(input.occurredAt) : undefined,
+    }, requireUser(user).id);
+  }, { body: t.Any() })
+  .get("/:id", ({ params, user }: any) => getSafetyReport(params.id, requireUser(user)))
+  .patch("/:id", ({ params, body, user }: any) => updateSafetyReportStatus(params.id, updateSafetySchema.parse(body).status, requireUser(user)), {
+    body: t.Object({ status: t.Union([t.Literal("new"), t.Literal("acknowledged"), t.Literal("resolved")]) }),
+  });

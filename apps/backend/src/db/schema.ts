@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, boolean, integer, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, boolean, doublePrecision, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -30,7 +30,7 @@ export const cases = pgTable("cases", {
   clientCreatedAt: timestamp("client_created_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-}, (t) => ({ uniqClient: [t.createdBy, t.clientId] }));
+}, (t) => ({ uniqClient: uniqueIndex("cases_created_by_client_id").on(t.createdBy, t.clientId) }));
 
 export const caseNotes = pgTable("case_notes", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -53,7 +53,7 @@ export const safetyReports = pgTable("safety_reports", {
   status: text("status", { enum: ["new", "acknowledged", "resolved"] }).default("new"),
   occurredAt: timestamp("occurred_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-}, (t) => ({ uniqSafetyClient: [t.createdBy, t.clientId] }));
+}, (t) => ({ uniqSafetyClient: uniqueIndex("safety_created_by_client_id").on(t.createdBy, t.clientId) }));
 
 export const servicePoints = pgTable("service_points", {
   id: uuid("id").primaryKey().defaultRandom(),
