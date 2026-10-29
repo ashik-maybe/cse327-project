@@ -1,11 +1,9 @@
 import { Elysia, t } from "elysia";
-import cookie from "@elysiajs/cookie";
 import { loginSchema, registerSchema } from "@campbridge/shared";
 import { register, login, me } from "../services/auth.service";
-import { verifySession } from "../utils/session";
+import { cookieValue, verifySession } from "../utils/session";
 
 export const authRoute = new Elysia({ prefix: "/api/auth" })
-  .use(cookie())
   .post(
     "/register",
     async ({ body }: any) => register(registerSchema.parse(body)),
@@ -20,17 +18,19 @@ export const authRoute = new Elysia({ prefix: "/api/auth" })
   )
   .post(
     "/login",
-    async ({ body, setCookie }: any) => {
+    async ({ body, set }: any) => {
       const input = loginSchema.parse(body);
-      return login(input.email, input.password, setCookie);
+      const result = await login(input.email, input.password);
+      set.headers["Set-Cookie"] = `campbridge_session=${encodeURIComponent(result.session)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`;
+      return { user: result.user };
     },
     { body: t.Object({ email: t.String(), password: t.String() }) }
   )
-  .post("/logout", async ({ removeCookie }: any) => {
-    removeCookie("campbridge_session");
+  .post("/logout", async ({ set }: any) => {
+    set.headers["Set-Cookie"] = "campbridge_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0";
     return { ok: true };
   })
   .get("/me", async ({ cookie }: any) => {
-    const userId = verifySession(cookie?.campbridge_session);
+    const userId = verifySession(cookieValue(cookie?.campbridge_session));
     return { user: await me(userId ?? undefined) };
   });

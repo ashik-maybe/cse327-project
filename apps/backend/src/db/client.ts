@@ -5,3 +5,4 @@ import * as schema from "./schema";
 const databaseUrl = process.env.DATABASE_URL ?? "postgres://campbridge:campbridge@localhost:5432/campbridge";
 const client = postgres(databaseUrl);
 export const dbClient = drizzle(client, { schema });
+export const closeDb = () => client.end();

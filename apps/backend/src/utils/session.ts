@@ -21,3 +21,11 @@ export function verifySession(value: string | undefined) {
   if (!timingSafeEqual(Buffer.from(provided), Buffer.from(expected))) return null;
   return userId;
 }
+
+export function cookieValue(value: unknown) {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && "value" in value && typeof value.value === "string") {
+    return value.value;
+  }
+  return undefined;
+}

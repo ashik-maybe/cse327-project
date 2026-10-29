@@ -7,11 +7,12 @@ import { dashboardRoute } from "./routes/dashboard";
 import { safetyRoute } from "./routes/safety";
 import { servicePointsRoute } from "./routes/service-points";
 import { getAuthenticatedUser } from "./middleware/auth";
+import { cookieValue } from "./utils/session";
 
 export const app = new Elysia()
   .use(cookie())
   .derive(async ({ cookie: cookies }) => ({
-    user: await getAuthenticatedUser(cookies?.campbridge_session),
+    user: await getAuthenticatedUser(cookieValue(cookies?.campbridge_session)),
   }))
   .use(authRoute)
   .use(healthRoute)
