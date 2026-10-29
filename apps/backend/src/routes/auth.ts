@@ -20,17 +20,17 @@ export const authRoute = new Elysia({ prefix: "/api/auth" })
   )
   .post(
     "/login",
-    async ({ body, cookie }: any) => {
+    async ({ body, setCookie }: any) => {
       const input = loginSchema.parse(body);
-      return login(input.email, input.password, cookie);
+      return login(input.email, input.password, setCookie);
     },
     { body: t.Object({ email: t.String(), password: t.String() }) }
   )
-  .post("/logout", async ({ cookie }: any) => {
-    cookie.set({ name: "campbridge_session", value: "", maxAge: 0, path: "/", httpOnly: true, sameSite: "lax" });
+  .post("/logout", async ({ removeCookie }: any) => {
+    removeCookie("campbridge_session");
     return { ok: true };
   })
   .get("/me", async ({ cookie }: any) => {
-    const userId = verifySession(cookie?.campbridge_session?.value);
+    const userId = verifySession(cookie?.campbridge_session);
     return { user: await me(userId ?? undefined) };
   });

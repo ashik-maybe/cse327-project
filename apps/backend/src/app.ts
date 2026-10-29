@@ -11,7 +11,7 @@ import { getAuthenticatedUser } from "./middleware/auth";
 export const app = new Elysia()
   .use(cookie())
   .derive(async ({ cookie: cookies }) => ({
-    user: await getAuthenticatedUser((cookies?.campbridge_session as { value?: string } | undefined)?.value),
+    user: await getAuthenticatedUser(cookies?.campbridge_session),
   }))
   .use(authRoute)
   .use(healthRoute)

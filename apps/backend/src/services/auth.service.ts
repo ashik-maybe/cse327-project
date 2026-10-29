@@ -30,12 +30,10 @@ export const register = async (body: {
   return { user: { id: user.id, name: user.name, email: user.email, role: user.role } };
 };
 
-export const login = async (email: string, password: string, cookie: any) => {
+export const login = async (email: string, password: string, setCookie: (name: string, value: string, options?: Record<string, unknown>) => void) => {
   const [row] = await dbClient.select().from(users).where(eq(users.email, email));
   if (!row || !compare(password, row.passwordHash)) throw new Error("INVALID_CREDENTIALS");
-  cookie.set({
-    name: "campbridge_session",
-    value: createSession(row.id),
+  setCookie("campbridge_session", createSession(row.id), {
     httpOnly: true,
     maxAge: 86400,
     path: "/",
