@@ -8,11 +8,11 @@
     "packages/*"
   ],
   "scripts": {
-    "backend:dev": "bun run -C apps/backend dev",
-    "frontend:dev": "bun run -C apps/frontend dev",
-    "db:generate": "bun run -C apps/backend db:generate",
-    "db:migrate": "bun run -C apps/backend db:migrate",
-    "db:seed": "bun run -C apps/backend db:seed"
+    "backend:dev": "cd apps/backend && bun run dev",
+    "frontend:dev": "cd apps/frontend && bun run dev",
+    "db:generate": "cd apps/backend && bun run db:generate",
+    "db:migrate": "cd apps/backend && bun run db:migrate",
+    "db:seed": "cd apps/backend && bun run db:seed"
   },
   "dependencies": {
     "@campbridge/shared": "workspace:*"
