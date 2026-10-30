@@ -3,11 +3,13 @@
 ## Completed
 
 - Milestones 1–5 merged into `shared`.
-- Fix branch: `frontend-core-fixes`.
+- Fixes merged into `shared` from `frontend-core-fixes`.
 - Database migrations and repeatable demo seed.
 - Signed session cookies and role-aware API access.
 - Cases, dashboard, safety, and service-point routes.
 - Frontend core, safety report form, and service-point listing.
+- Local frontend walkthrough is demo-able with seeded volunteer and team-lead
+  accounts; see `docs/10-demo.md`.
 
 ## Deferred
 
