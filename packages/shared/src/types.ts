@@ -1,11 +1,14 @@
 import * as schemas from "./schemas/auth";
 import * as caseSchemas from "./schemas/case";
 import * as safetySchemas from "./schemas/safety";
+import * as servicePointSchemas from "./schemas/service-point";
 export type RegisterInput = import("zod").infer<typeof schemas.registerSchema>;
 export type CreateCaseInput = import("zod").infer<typeof caseSchemas.createCaseSchema>;
 export type UpdateCaseInput = import("zod").infer<typeof caseSchemas.updateCaseSchema>;
 export type CreateSafetyInput = import("zod").infer<typeof safetySchemas.createSafetySchema>;
 export type UpdateSafetyInput = import("zod").infer<typeof safetySchemas.updateSafetySchema>;
+export type CreateServicePointInput = import("zod").infer<typeof servicePointSchemas.createServicePointSchema>;
+export type UpdateServicePointInput = import("zod").infer<typeof servicePointSchemas.updateServicePointSchema>;
 
 export type SafetyRecord = {
   id: string;
