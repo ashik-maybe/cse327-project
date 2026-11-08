@@ -1,6 +1,6 @@
 import { dbClient } from "../db/client";
 import { cases, caseNotes, users } from "../db/schema";
-import { and, count, eq, ilike, or, desc } from "drizzle-orm";
+import { and, count, eq, getTableColumns, ilike, or, desc } from "drizzle-orm";
 import type { CreateCaseInput, UpdateCaseInput } from "@campbridge/shared";
 
 type User = { id: string; role: string };
@@ -35,8 +35,9 @@ export async function listCases(
   const where = conditions.length ? and(...conditions) : undefined;
   const [{ total }] = await dbClient.select({ total: count() }).from(cases).where(where);
   const items = await dbClient
-    .select()
+    .select({ ...getTableColumns(cases), assigneeName: users.name })
     .from(cases)
+    .leftJoin(users, eq(cases.assignedTo, users.id))
     .where(where)
     .orderBy(desc(cases.createdAt))
     .limit(limit)
@@ -65,7 +66,12 @@ export async function createCase(input: CreateCaseInput, userId: string) {
 }
 
 export async function getCase(id: string, user: User) {
-  const [record] = await dbClient.select().from(cases).where(eq(cases.id, id)).limit(1);
+  const [record] = await dbClient
+    .select({ ...getTableColumns(cases), assigneeName: users.name })
+    .from(cases)
+    .leftJoin(users, eq(cases.assignedTo, users.id))
+    .where(eq(cases.id, id))
+    .limit(1);
   if (!record) return null;
   if (user.role !== "team_lead" && record.createdBy !== user.id && record.assignedTo !== user.id) {
     throw new Error("FORBIDDEN");
@@ -73,10 +79,23 @@ export async function getCase(id: string, user: User) {
   return record;
 }
 
+async function assertAssignableVolunteer(userId: string) {
+  const [assignee] = await dbClient
+    .select({ id: users.id, role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!assignee || assignee.role !== "volunteer") throw new Error("INVALID_ASSIGNEE");
+}
+
 export async function updateCase(id: string, input: UpdateCaseInput, user: User) {
   const record = await getCase(id, user);
   if (!record) return null;
   if (user.role !== "team_lead" && record.createdBy !== user.id) throw new Error("FORBIDDEN");
+  if (input.assignedTo !== undefined) {
+    if (user.role !== "team_lead") throw new Error("FORBIDDEN");
+    if (input.assignedTo !== null) await assertAssignableVolunteer(input.assignedTo);
+  }
   const [updated] = await dbClient
     .update(cases)
     .set({
@@ -86,7 +105,11 @@ export async function updateCase(id: string, input: UpdateCaseInput, user: User)
     })
     .where(eq(cases.id, id))
     .returning();
-  return updated ?? null;
+  if (!updated) return null;
+  const [assignee] = updated.assignedTo
+    ? await dbClient.select({ name: users.name }).from(users).where(eq(users.id, updated.assignedTo)).limit(1)
+    : [];
+  return { ...updated, assigneeName: assignee?.name ?? null };
 }
 
 export async function addCaseNote(caseId: string, user: User, note: string) {
