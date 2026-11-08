@@ -1,20 +1,44 @@
 import { Elysia, t } from "elysia";
+import { createServicePointSchema, updateServicePointSchema } from "@campbridge/shared";
 import { requireRole, requireUser } from "../middleware/role";
 import { createServicePoint, deleteServicePoint, listServicePoints, updateServicePoint } from "../services/service-point.service";
 
-const pointBody = t.Object({
-  name: t.String(),
-  category: t.String(),
-  area: t.Optional(t.String()),
-  description: t.Optional(t.String()),
-  contactNote: t.Optional(t.String()),
-  latitude: t.Number(),
-  longitude: t.Number(),
-  openingHours: t.Optional(t.String()),
-});
+const pointBody = t.Any();
 
 export const servicePointsRoute = new Elysia({ prefix: "/api/service-points" })
-  .get("/", () => listServicePoints())
-  .post("/", ({ body, user }: any) => createServicePoint(requireRole(user, ["team_lead"]) && body), { body: pointBody })
-  .patch("/:id", ({ body, params, user }: any) => updateServicePoint(params.id, requireRole(user, ["team_lead"]) && body), { body: t.Partial(pointBody) })
-  .delete("/:id", ({ params, user }: any) => deleteServicePoint(params.id), { beforeHandle: ({ user }: any) => requireRole(user, ["team_lead"]) });
+  .get(
+    "/",
+    ({ query, user }: any) => {
+      const current = requireUser(user);
+      return listServicePoints({
+        category: query.category,
+        includeInactive: query.includeInactive === "true" && current.role === "team_lead",
+      });
+    },
+    {
+      query: t.Object({
+        category: t.Optional(t.String()),
+        includeInactive: t.Optional(t.String()),
+      }),
+    }
+  )
+  .post(
+    "/",
+    ({ body, user }: any) => {
+      requireRole(user, ["team_lead"]);
+      return createServicePoint(createServicePointSchema.parse(body));
+    },
+    { body: pointBody }
+  )
+  .patch(
+    "/:id",
+    ({ body, params, user }: any) => {
+      requireRole(user, ["team_lead"]);
+      return updateServicePoint(params.id, updateServicePointSchema.parse(body));
+    },
+    { body: pointBody }
+  )
+  .delete("/:id", ({ params, user }: any) => {
+    requireRole(user, ["team_lead"]);
+    return deleteServicePoint(params.id);
+  });

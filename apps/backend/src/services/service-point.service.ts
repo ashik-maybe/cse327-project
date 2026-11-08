@@ -1,9 +1,20 @@
 import { dbClient } from "../db/client";
 import { servicePoints } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
-export function listServicePoints() {
-  return dbClient.select().from(servicePoints).where(eq(servicePoints.isActive, true));
+type ListFilters = {
+  category?: string;
+  includeInactive?: boolean;
+};
+
+export function listServicePoints(filters: ListFilters = {}) {
+  const conditions = [
+    filters.includeInactive ? undefined : eq(servicePoints.isActive, true),
+    filters.category ? eq(servicePoints.category, filters.category) : undefined,
+  ].filter(Boolean);
+  const query = dbClient.select().from(servicePoints);
+  const scoped = conditions.length ? query.where(and(...conditions)) : query;
+  return scoped.orderBy(servicePoints.name);
 }
 
 export function createServicePoint(input: typeof servicePoints.$inferInsert) {
