@@ -1,4 +1,4 @@
-import type { CreateCaseInput, DashboardSummary, SafetyRecord, ServicePointRecord } from "@campbridge/shared"
+import type { CreateCaseInput, CreateServicePointInput, DashboardSummary, SafetyRecord, ServicePointRecord, UpdateServicePointInput } from "@campbridge/shared"
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api"
 
@@ -106,6 +106,7 @@ export type CaseRecord = {
   aiSource?: string | null
   createdBy?: string | null
   assignedTo?: string | null
+  assigneeName?: string | null
   createdAt?: string
   updatedAt?: string
 }
@@ -121,7 +122,8 @@ export const casesApi = {
   },
   get: (id: string) => get<CaseRecord>(`/cases/${id}`),
   create: (input: CreateCaseInput) => post<{ case: CaseRecord; created: boolean }>("/cases", input),
-  update: (id: string, input: Partial<CreateCaseInput>) => patch<CaseRecord>(`/cases/${id}`, input),
+  update: (id: string, input: Partial<CreateCaseInput> & { assignedTo?: string | null }) =>
+    patch<CaseRecord>(`/cases/${id}`, input),
   notes: (id: string) => get<Array<{ note: string; createdAt: string; userName?: string }>>(`/cases/${id}/notes`),
   addNote: (id: string, note: string) => post(`/cases/${id}/notes`, { note }),
 }
@@ -152,7 +154,20 @@ export const safetyApi = {
 }
 
 export const servicePointsApi = {
-  list: () => get<ServicePointRecord[]>("/service-points"),
+  list: (params?: { category?: string; includeInactive?: boolean }) => {
+    const qs = new URLSearchParams()
+    if (params?.category) qs.set("category", params.category)
+    if (params?.includeInactive) qs.set("includeInactive", "true")
+    const suffix = qs.toString() ? `?${qs}` : ""
+    return get<ServicePointRecord[]>(`/service-points${suffix}`)
+  },
+  create: (input: CreateServicePointInput) => post<ServicePointRecord[]>("/service-points", input),
+  update: (id: string, input: UpdateServicePointInput) => patch<ServicePointRecord[]>(`/service-points/${id}`, input),
+  remove: (id: string) => del<ServicePointRecord[]>(`/service-points/${id}`),
+}
+
+export const usersApi = {
+  volunteers: () => get<Array<{ id: string; name: string }>>("/users/volunteers"),
 }
 
 export type { DashboardSummary, SafetyRecord, ServicePointRecord } from "@campbridge/shared"
