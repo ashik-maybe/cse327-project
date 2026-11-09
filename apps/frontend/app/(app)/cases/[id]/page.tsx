@@ -18,7 +18,7 @@ import {
 import { EmptyState, ErrorState, LoadingState } from "@/components/states"
 import { CategoryLabel, StatusBadge, UrgencyBadge } from "@/components/case-badges"
 import { useAuth } from "@/lib/auth"
-import { ApiError, casesApi } from "@/lib/api"
+import { ApiError, casesApi, usersApi } from "@/lib/api"
 
 function formatDateTime(value?: string | null) {
   if (!value) return "—"
@@ -51,6 +51,21 @@ export default function CaseDetailPage() {
   const notesQuery = useQuery({
     queryKey: ["cases", id, "notes"],
     queryFn: () => casesApi.notes(id),
+  })
+
+  const volunteersQuery = useQuery({
+    queryKey: ["users", "volunteers"],
+    queryFn: usersApi.volunteers,
+    enabled: isLead,
+  })
+
+  const assignMutation = useMutation({
+    mutationFn: (assignedTo: string | null) => casesApi.update(id, { assignedTo }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["cases", id] })
+      void queryClient.invalidateQueries({ queryKey: ["cases"] })
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "summary"] })
+    },
   })
 
   const statusMutation = useMutation({
@@ -169,12 +184,49 @@ export default function CaseDetailPage() {
           <CardContent className="space-y-3">
             <div className="flex items-center gap-2 text-sm">
               <User className="size-4 text-muted-foreground" aria-hidden />
-              <span>Assigned: {item.assignedTo ? item.assignedTo.slice(0, 8) : "Unassigned"}</span>
+              <span>Assigned: {item.assigneeName ?? (item.assignedTo ? item.assignedTo.slice(0, 8) : "Unassigned")}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Clock className="size-4 text-muted-foreground" aria-hidden />
               <span>Opened {formatDateTime(item.createdAt)}</span>
             </div>
+            {isLead ? (
+              <div className="space-y-1 border-t pt-3">
+                <label htmlFor="assignee" className="block text-xs font-medium text-muted-foreground">
+                  Assign volunteer
+                </label>
+                <Select
+                  value={item.assignedTo ?? "unassigned"}
+                  onValueChange={(value) => {
+                    if (!value) return
+                    assignMutation.mutate(value === "unassigned" ? null : value)
+                  }}
+                  disabled={assignMutation.isPending}
+                >
+                  <SelectTrigger id="assignee" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {volunteersQuery.data?.map((volunteer) => (
+                      <SelectItem key={volunteer.id} value={volunteer.id}>
+                        {volunteer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {volunteersQuery.isError ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    Could not load volunteers.
+                  </p>
+                ) : null}
+                {assignMutation.isError ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    {assignMutation.error instanceof Error ? assignMutation.error.message : "Could not assign case."}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             {item.latitude != null && item.longitude != null ? (
               <p className="text-xs text-muted-foreground">
                 Coordinates {item.latitude.toFixed(4)}, {item.longitude.toFixed(4)}
