@@ -14,9 +14,10 @@ import {
 } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { EmptyState, ErrorState, LoadingState } from "@/components/states"
+import { EmptyState, ErrorState, LoadingState, formatDateTime } from "@/components/states"
+import { StatusBadge, UrgencyBadge } from "@/components/case-badges"
 import { useAuth } from "@/lib/auth"
-import { dashboardApi } from "@/lib/api"
+import { casesApi, dashboardApi } from "@/lib/api"
 
 function StatCard({
   label,
@@ -59,6 +60,12 @@ export default function DashboardPage() {
   })
 
   const isLead = user?.role === "team_lead"
+
+  const queueQuery = useQuery({
+    queryKey: ["cases", "queue", user?.role],
+    queryFn: () => casesApi.list({ limit: 5 }),
+    enabled: Boolean(user),
+  })
 
   return (
     <div className="space-y-6">
@@ -127,15 +134,52 @@ export default function DashboardPage() {
             View all <ArrowRight data-icon="inline-end" aria-hidden />
           </Button>
         </div>
-        <EmptyState
-          title="Queue is clear"
-          description={isLead ? "No cases need attention right now." : "No cases are assigned to you right now."}
-          action={
-            <Button size="sm" render={<Link href="/cases/new" />}>
-              Log a case
-            </Button>
-          }
-        />
+        {queueQuery.isLoading ? <LoadingState label="Loading case queue…" /> : null}
+        {queueQuery.isError ? (
+          <ErrorState
+            title="Could not load the case queue"
+            description="Check your connection and try again."
+            action={
+              <Button variant="outline" size="sm" onClick={() => void queueQuery.refetch()}>
+                Retry
+              </Button>
+            }
+          />
+        ) : null}
+        {queueQuery.data && queueQuery.data.items.length === 0 ? (
+          <EmptyState
+            title="Queue is clear"
+            description={isLead ? "No cases need attention right now." : "No cases are assigned to you right now."}
+            action={
+              <Button size="sm" render={<Link href="/cases/new" />}>
+                Log a case
+              </Button>
+            }
+          />
+        ) : null}
+        {queueQuery.data && queueQuery.data.items.length > 0 ? (
+          <ul className="space-y-2">
+            {queueQuery.data.items.map((item) => (
+              <li key={item.id}>
+                <Link
+                  href={`/cases/${item.id}`}
+                  className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-3 transition-colors hover:bg-muted/50"
+                >
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <p className="truncate font-medium">{item.summary}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.assigneeName ?? "Unassigned"} · {formatDateTime(item.createdAt)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <UrgencyBadge urgency={item.urgency} />
+                    <StatusBadge status={item.status} />
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </section>
     </div>
   )
