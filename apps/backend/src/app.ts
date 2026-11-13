@@ -10,11 +10,12 @@ import { servicePointsRoute } from "./routes/service-points";
 import { usersRoute } from "./routes/users";
 import { getAuthenticatedUser } from "./middleware/auth";
 import { cookieValue } from "./utils/session";
+import { env } from "./env";
 
 export const app = new Elysia()
   .use(cookie())
   .derive(async ({ cookie: cookies }) => ({
-    user: await getAuthenticatedUser(cookieValue(cookies?.campbridge_session)),
+    user: await getAuthenticatedUser(cookieValue(cookies?.[env.authCookieName])),
   }))
   .onError(({ code, error, set }) => {
     if (code === "VALIDATION") {

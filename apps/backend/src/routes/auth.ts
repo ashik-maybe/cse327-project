@@ -2,6 +2,7 @@ import { Elysia, t } from "elysia";
 import { loginSchema, registerSchema } from "@campbridge/shared";
 import { register, login, me } from "../services/auth.service";
 import { cookieValue, verifySession } from "../utils/session";
+import { env } from "../env";
 import { authRateLimit } from "../plugins/rate-limit";
 
 export const authRoute = new Elysia({ prefix: "/api/auth" })
@@ -26,7 +27,7 @@ export const authRoute = new Elysia({ prefix: "/api/auth" })
     async ({ body, set }: any) => {
       const input = loginSchema.parse(body);
       const result = await login(input.email, input.password);
-      set.headers["Set-Cookie"] = `campbridge_session=${encodeURIComponent(result.session)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`;
+      set.headers["Set-Cookie"] = `${env.authCookieName}=${encodeURIComponent(result.session)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`;
       return { user: result.user };
     },
     {
@@ -35,10 +36,10 @@ export const authRoute = new Elysia({ prefix: "/api/auth" })
     }
   )
   .post("/logout", async ({ set }: any) => {
-    set.headers["Set-Cookie"] = "campbridge_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0";
+    set.headers["Set-Cookie"] = `${env.authCookieName}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
     return { ok: true };
   })
   .get("/me", async ({ cookie }: any) => {
-    const userId = verifySession(cookieValue(cookie?.campbridge_session));
+    const userId = verifySession(cookieValue(cookie?.[env.authCookieName]));
     return { user: await me(userId ?? undefined) };
   });

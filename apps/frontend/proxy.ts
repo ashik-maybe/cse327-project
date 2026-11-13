@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 const AUTH_ROUTES = ["/login", "/register"]
-const SESSION_COOKIE = "campbridge_session"
+const SESSION_COOKIE = process.env.AUTH_COOKIE_NAME ?? "campbridge_session"
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
