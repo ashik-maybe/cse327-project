@@ -2,6 +2,7 @@ import { Elysia, t } from "elysia";
 import { loginSchema, registerSchema } from "@campbridge/shared";
 import { register, login, me } from "../services/auth.service";
 import { cookieValue, verifySession } from "../utils/session";
+import { authRateLimit } from "../plugins/rate-limit";
 
 export const authRoute = new Elysia({ prefix: "/api/auth" })
   .post(
@@ -11,6 +12,7 @@ export const authRoute = new Elysia({ prefix: "/api/auth" })
       return register({ ...input, role: "volunteer" });
     },
     {
+      beforeHandle: authRateLimit,
       body: t.Object({
         name: t.String(),
         email: t.String(),
@@ -27,7 +29,10 @@ export const authRoute = new Elysia({ prefix: "/api/auth" })
       set.headers["Set-Cookie"] = `campbridge_session=${encodeURIComponent(result.session)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`;
       return { user: result.user };
     },
-    { body: t.Object({ email: t.String(), password: t.String() }) }
+    {
+      beforeHandle: authRateLimit,
+      body: t.Object({ email: t.String(), password: t.String() }),
+    }
   )
   .post("/logout", async ({ set }: any) => {
     set.headers["Set-Cookie"] = "campbridge_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0";
