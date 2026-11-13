@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useForm, useWatch } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation } from "@tanstack/react-query"
 import { z } from "zod"
@@ -13,13 +13,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { ApiError, authApi } from "@/lib/api"
 
 const registerFormSchema = registerSchema
@@ -38,9 +31,8 @@ export default function RegisterPage() {
 
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerFormSchema),
-    defaultValues: { name: "", email: "", password: "", confirmPassword: "", role: "volunteer" },
+    defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
   })
-  const role = useWatch({ control: form.control, name: "role" })
 
   const register = useMutation({
     mutationFn: (values: RegisterValues) =>
@@ -48,7 +40,7 @@ export default function RegisterPage() {
         name: values.name,
         email: values.email,
         password: values.password,
-        role: values.role,
+        role: "volunteer",
       }),
     onSuccess: () => router.replace("/login"),
   })
@@ -92,17 +84,8 @@ export default function RegisterPage() {
               ) : null}
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="role">Role</Label>
-              <Select value={role} onValueChange={(value) => form.setValue("role", value as RegisterValues["role"])}>
-                <SelectTrigger id="role" className="w-full">
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="volunteer">Volunteer</SelectItem>
-                  <SelectItem value="team_lead">Team lead</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              New accounts join as volunteers. A team lead can promote you later.
             </div>
 
             <div className="space-y-1.5">

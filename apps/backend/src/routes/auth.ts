@@ -6,7 +6,10 @@ import { cookieValue, verifySession } from "../utils/session";
 export const authRoute = new Elysia({ prefix: "/api/auth" })
   .post(
     "/register",
-    async ({ body }: any) => register(registerSchema.parse(body)),
+    async ({ body }: any) => {
+      const input = registerSchema.parse(body);
+      return register({ ...input, role: "volunteer" });
+    },
     {
       body: t.Object({
         name: t.String(),
