@@ -24,7 +24,14 @@ export const casesRoute = new Elysia({ prefix: "/api/cases" })
     return createCase(createCaseSchema.parse(body), current.id);
   }, { body: t.Any() })
   .get("/:id", ({ params, user }: any) => getCase(params.id, requireUser(user)))
-  .patch("/:id", ({ body, params, user }: any) => updateCase(params.id, updateCaseSchema.parse(body), requireUser(user)), { body: t.Any() })
+  .patch("/:id", async ({ body, params, user, set }: any) => {
+    const updated = await updateCase(params.id, updateCaseSchema.parse(body), requireUser(user));
+    if (!updated) {
+      set.status = 404;
+      return { error: { message: "Case not found", code: "NOT_FOUND" } };
+    }
+    return updated;
+  }, { body: t.Any() })
   .post("/:id/notes", ({ body, params, user }: any) => addCaseNote(params.id, requireUser(user), body.note), {
     body: t.Object({ note: t.String({ minLength: 1 }) }),
   })
