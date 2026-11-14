@@ -22,15 +22,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ApiError, casesApi } from "@/lib/api"
+import { ApiError, aiApi, casesApi, type CaseIntakeInput, type CaseIntakeResponse } from "@/lib/api"
 
 type CaseValues = z.infer<typeof createCaseSchema>
+
+const SAMPLE_FIXTURES = [
+  { id: "sample-1", label: "Shelter roof collapsed (sample)" },
+  { id: "sample-2", label: "Mother's fever, no medicine (sample)" },
+  { id: "sample-3", label: "Ration not received (sample)" },
+] as const
+
+const CASE_CATEGORIES = ["shelter", "protection", "food", "wash", "health", "other"] as const
+const CASE_URGENCIES = ["low", "medium", "high", "critical"] as const
 
 export default function NewCasePage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const clientId = useRef<string>(crypto.randomUUID())
   const [coordinatesOpen, setCoordinatesOpen] = useState(false)
+  const [banglaText, setBanglaText] = useState("")
+  const [aiResult, setAiResult] = useState<CaseIntakeResponse | null>(null)
+  const [aiSource, setAiSource] = useState<string | null>(null)
 
   const form = useForm<CaseValues>({
     resolver: zodResolver(createCaseSchema),
@@ -49,9 +61,46 @@ export default function NewCasePage() {
   const category = useWatch({ control: form.control, name: "category" })
   const urgency = useWatch({ control: form.control, name: "urgency" })
 
+  const analyze = useMutation({
+    mutationFn: (input: CaseIntakeInput) => aiApi.caseIntake(input),
+    onSuccess: (data) => {
+      setAiResult(data)
+      setAiSource(null)
+    },
+  })
+
+  const applyAiResult = () => {
+    if (!aiResult) return
+    const category = (CASE_CATEGORIES as readonly string[]).includes(aiResult.category)
+      ? (aiResult.category as CaseValues["category"])
+      : "other"
+    const urgency = (CASE_URGENCIES as readonly string[]).includes(aiResult.urgency)
+      ? (aiResult.urgency as CaseValues["urgency"])
+      : "medium"
+    form.setValue("summary", aiResult.englishSummary, { shouldValidate: true })
+    form.setValue("description", aiResult.originalText ?? "", { shouldValidate: true })
+    form.setValue("category", category, { shouldValidate: true })
+    form.setValue("urgency", urgency, { shouldValidate: true })
+    form.setValue("nextContact", aiResult.nextContact ?? "", { shouldValidate: true })
+    form.setValue("aiAssisted", true)
+    form.setValue("aiSource", aiResult.provider)
+    setAiSource(aiResult.provider)
+  }
+
+  const analyzeError =
+    analyze.error instanceof ApiError
+      ? analyze.error.message
+      : analyze.error
+        ? "AI intake failed. You can still fill the form manually."
+        : null
+
   const create = useMutation({
     mutationFn: (values: CaseValues) =>
-      casesApi.create({ ...values, clientId: clientId.current }),
+      casesApi.create({
+        ...values,
+        clientId: clientId.current,
+        ...(aiSource ? { aiAssisted: true, aiSource } : {}),
+      }),
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ["cases"] })
       router.replace(`/cases/${data.case.id}`)
@@ -70,19 +119,84 @@ export default function NewCasePage() {
         </Button>
         <h1 className="text-2xl font-semibold tracking-tight">Log a new case</h1>
         <p className="text-sm text-muted-foreground">
-          Record the request while it is fresh. AI intake arrives in the next milestone.
+          Record the request while it is fresh. AI intake can draft the form from a Bangla note — review it before saving.
         </p>
       </div>
 
-      <Card className="border-dashed bg-muted/30">
-        <CardContent className="flex items-start gap-3 py-4">
-          <Sparkle className="mt-0.5 size-5 text-primary" aria-hidden />
-          <div className="space-y-1">
-            <p className="text-sm font-medium">AI intake coming next</p>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkle className="size-4 text-primary" aria-hidden />
+            AI intake
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="banglaText">Bangla note</Label>
+            <Textarea
+              id="banglaText"
+              rows={3}
+              placeholder="এখানে বাংলায় লিখুন…"
+              value={banglaText}
+              onChange={(event) => setBanglaText(event.target.value)}
+            />
             <p className="text-xs text-muted-foreground">
-              Bangla voice or text will fill this form automatically. You can still enter every field manually now.
+              Paste or type what the community member said. AI drafts the form — you review and edit before saving.
             </p>
           </div>
+
+          <div className="flex flex-wrap gap-2">
+            {SAMPLE_FIXTURES.map((sample) => (
+              <Button
+                key={sample.id}
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={analyze.isPending}
+                onClick={() => analyze.mutate({ sampleId: sample.id })}
+              >
+                {sample.label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={analyze.isPending || banglaText.trim().length === 0}
+              onClick={() => analyze.mutate({ banglaText: banglaText.trim() })}
+            >
+              {analyze.isPending ? "Analyzing…" : "Analyze"}
+            </Button>
+            {aiSource ? (
+              <span className="text-xs text-muted-foreground">Applied — saved as AI-assisted ({aiSource})</span>
+            ) : null}
+          </div>
+
+          {analyzeError ? (
+            <Alert variant="destructive">
+              <AlertDescription>{analyzeError}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          {aiResult ? (
+            <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-medium">AI draft preview</p>
+                <span className="text-xs text-muted-foreground">provider: {aiResult.provider}</span>
+              </div>
+              <p>{aiResult.englishSummary}</p>
+              <dl className="grid grid-cols-1 gap-1 text-xs text-muted-foreground sm:grid-cols-3">
+                <div><dt className="inline font-medium">Category: </dt><dd className="inline">{aiResult.category}</dd></div>
+                <div><dt className="inline font-medium">Urgency: </dt><dd className="inline">{aiResult.urgency}</dd></div>
+                <div><dt className="inline font-medium">Next contact: </dt><dd className="inline">{aiResult.nextContact}</dd></div>
+              </dl>
+              <Button type="button" size="sm" variant="secondary" onClick={applyAiResult}>
+                Apply to form
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
