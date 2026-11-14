@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useForm, useWatch } from "react-hook-form"
@@ -7,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation } from "@tanstack/react-query"
 import { z } from "zod"
 import { createSafetySchema } from "@campbridge/shared"
-import { ArrowLeft } from "@phosphor-icons/react"
+import { ArrowLeft, Eraser } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -15,7 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ApiError, safetyApi } from "@/lib/api"
+import { ApiError, aiApi, safetyApi } from "@/lib/api"
 
 type Values = z.infer<typeof createSafetySchema>
 
@@ -27,6 +28,24 @@ export default function NewSafetyReportPage() {
   })
   const incidentType = useWatch({ control: form.control, name: "incidentType" })
   const urgency = useWatch({ control: form.control, name: "urgency" })
+  const [sourceText, setSourceText] = useState("")
+  const [redactionCount, setRedactionCount] = useState<number | null>(null)
+  const [anonymizeProvider, setAnonymizeProvider] = useState<string | null>(null)
+
+  const anonymize = useMutation({
+    mutationFn: (text: string) => aiApi.anonymize(text),
+    onSuccess: (data) => {
+      form.setValue("anonymizedDescription", data.anonymizedText, { shouldValidate: true })
+      setRedactionCount(data.redactionCount)
+      setAnonymizeProvider(data.provider)
+    },
+  })
+  const anonymizeError =
+    anonymize.error instanceof ApiError
+      ? anonymize.error.message
+      : anonymize.error
+        ? "Could not anonymize the text. You can still write the description manually."
+        : null
   const create = useMutation({
     mutationFn: safetyApi.create,
     onSuccess: () => router.replace("/safety"),
@@ -64,6 +83,42 @@ export default function NewSafetyReportPage() {
                   <SelectItem value="critical">Critical</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1.5 rounded-md border bg-muted/30 p-3">
+              <Label htmlFor="sourceText">Original note (not saved)</Label>
+              <Textarea
+                id="sourceText"
+                rows={4}
+                placeholder="Paste the original note with names, phone numbers, or other identifying details…"
+                value={sourceText}
+                onChange={(event) => setSourceText(event.target.value)}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={anonymize.isPending || sourceText.trim().length === 0}
+                  onClick={() => anonymize.mutate(sourceText.trim())}
+                >
+                  <Eraser data-icon="inline-start" aria-hidden />
+                  {anonymize.isPending ? "Anonymizing…" : "Anonymize preview"}
+                </Button>
+                {redactionCount !== null ? (
+                  <span className="text-xs text-muted-foreground">
+                    {redactionCount} redaction{redactionCount === 1 ? "" : "s"}
+                    {anonymizeProvider ? ` · provider: ${anonymizeProvider}` : ""}
+                  </span>
+                ) : null}
+              </div>
+              {anonymizeError ? (
+                <Alert variant="destructive">
+                  <AlertDescription>{anonymizeError}</AlertDescription>
+                </Alert>
+              ) : null}
+              <p className="text-xs text-muted-foreground">
+                The anonymized text fills the description below. The original note stays on this page and is never submitted.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="anonymizedDescription">Anonymized description</Label>
