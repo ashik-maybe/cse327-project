@@ -128,6 +128,57 @@ export const casesApi = {
   addNote: (id: string, note: string) => post(`/cases/${id}/notes`, { note }),
 }
 
+// ---- AI helpers ----
+
+export type CaseIntakeResponse = {
+  englishSummary: string
+  category: string
+  urgency: string
+  nextContact: string
+  originalText: string
+  provider: string
+}
+
+export type TriageResponse = {
+  category: string
+  urgency: string
+  nextContact: string
+  provider: string
+}
+
+export type AnonymizeResponse = {
+  anonymizedText: string
+  redactionCount: number
+  provider: string
+}
+
+export type FollowUpResponse = {
+  suggestion: string
+  provider: string
+}
+
+export type CaseIntakeInput = {
+  banglaText?: string
+  sampleId?: string
+  audioBase64?: string
+  audioMimeType?: string
+}
+
+export type TriageInput = { text: string }
+
+export type AnonymizeInput = { text: string; useGemini?: boolean }
+
+export const aiApi = {
+  caseIntake: (body: CaseIntakeInput) =>
+    post<CaseIntakeResponse>("/ai/case-intake", body),
+  triage: (body: TriageInput) => post<TriageResponse>("/ai/triage", body),
+  // Accept a legacy bare string too so in-flight callers keep compiling; prefer AnonymizeInput.
+  anonymize: (body: AnonymizeInput | string) =>
+    post<AnonymizeResponse>("/ai/anonymize", typeof body === "string" ? { text: body } : body),
+  followUp: (body: { summary?: string; category?: string }) =>
+    post<FollowUpResponse>("/ai/follow-up", body),
+}
+
 export const dashboardApi = {
   summary: () => get<DashboardSummary>("/dashboard/summary"),
 }
