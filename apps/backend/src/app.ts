@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import cookie from "@elysiajs/cookie";
 import { ZodError } from "zod";
+import { aiRoute } from "./routes/ai";
 import { authRoute } from "./routes/auth";
 import { healthRoute } from "./routes/health";
 import { casesRoute } from "./routes/cases";
@@ -51,4 +52,5 @@ export const app = new Elysia()
   .use(dashboardRoute)
   .use(safetyRoute)
   .use(servicePointsRoute)
-  .use(usersRoute);
+  .use(usersRoute)
+  .use(aiRoute);
