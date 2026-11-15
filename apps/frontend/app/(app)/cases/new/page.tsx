@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ApiError, aiApi, casesApi, type CaseIntakeInput, type CaseIntakeResponse } from "@/lib/api"
+import { enqueueCase } from "@/lib/offline"
 
 type CaseValues = z.infer<typeof createCaseSchema>
 
@@ -40,6 +41,7 @@ export default function NewCasePage() {
   const queryClient = useQueryClient()
   const clientId = useRef<string>(crypto.randomUUID())
   const [coordinatesOpen, setCoordinatesOpen] = useState(false)
+  const [queued, setQueued] = useState(false)
   const [banglaText, setBanglaText] = useState("")
   const [aiResult, setAiResult] = useState<CaseIntakeResponse | null>(null)
   const [aiSource, setAiSource] = useState<string | null>(null)
@@ -95,14 +97,36 @@ export default function NewCasePage() {
         : null
 
   const create = useMutation({
-    mutationFn: (values: CaseValues) =>
-      casesApi.create({
+    mutationFn: async (values: CaseValues) => {
+      const payload = {
         ...values,
         clientId: clientId.current,
         ...(aiSource ? { aiAssisted: true, aiSource } : {}),
-      }),
+      }
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await enqueueCase(payload)
+        return { queued: true as const }
+      }
+      try {
+        return await casesApi.create(payload)
+      } catch (error) {
+        const networkFailure =
+          error instanceof ApiError &&
+          (error.status === 0 || error.code === "NETWORK_ERROR" || error.code === "TIMEOUT")
+        if (networkFailure) {
+          await enqueueCase(payload)
+          return { queued: true as const }
+        }
+        throw error
+      }
+    },
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ["cases"] })
+      if ("queued" in data) {
+        setQueued(true)
+        window.setTimeout(() => router.replace("/cases"), 1800)
+        return
+      }
       router.replace(`/cases/${data.case.id}`)
     },
   })
@@ -315,6 +339,12 @@ export default function NewCasePage() {
                 </div>
               ) : null}
             </div>
+
+            {queued ? (
+              <Alert>
+                <AlertDescription>Queued — will sync when online</AlertDescription>
+              </Alert>
+            ) : null}
 
             {errorMessage ? (
               <Alert variant="destructive">
