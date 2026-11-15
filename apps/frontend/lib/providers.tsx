@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { AuthProvider } from "./auth"
+import { replayPendingCases } from "./offline"
 
 export function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -17,6 +18,15 @@ export function Providers({ children }: { children: ReactNode }) {
         },
       })
   )
+
+  useEffect(() => {
+    void replayPendingCases().catch(() => {})
+    const onOnline = () => {
+      void replayPendingCases().catch(() => {})
+    }
+    window.addEventListener("online", onOnline)
+    return () => window.removeEventListener("online", onOnline)
+  }, [])
 
   return (
     <QueryClientProvider client={client}>
