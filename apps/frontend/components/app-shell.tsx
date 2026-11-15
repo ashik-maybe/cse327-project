@@ -1,15 +1,33 @@
 "use client"
 
-import { useEffect, type ReactNode } from "react"
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { SignOut, FirstAid } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
-import { LoadingState } from "@/components/states"
+import { LoadingState, OfflineBadge } from "@/components/states"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { DesktopNav, MobileNav } from "@/components/app-nav"
 import { useAuth } from "@/lib/auth"
 import { authApi } from "@/lib/api"
+import { listPendingCases, PENDING_CASES_EVENT } from "@/lib/offline"
+
+function subscribeOnlineStatus(callback: () => void) {
+  window.addEventListener("online", callback)
+  window.addEventListener("offline", callback)
+  return () => {
+    window.removeEventListener("online", callback)
+    window.removeEventListener("offline", callback)
+  }
+}
+
+function getOnlineSnapshot() {
+  return navigator.onLine
+}
+
+function getOnlineServerSnapshot() {
+  return true
+}
 
 function roleLabel(role: string) {
   return role === "team_lead" ? "Team Lead" : "Volunteer"
@@ -19,6 +37,29 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth()
   const router = useRouter()
   const queryClient = useQueryClient()
+  const isOnline = useSyncExternalStore(subscribeOnlineStatus, getOnlineSnapshot, getOnlineServerSnapshot)
+  const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    const refresh = () => {
+      listPendingCases()
+        .then((items) => {
+          if (!cancelled) setPendingCount(items.length)
+        })
+        .catch(() => {
+          if (!cancelled) setPendingCount(0)
+        })
+    }
+    refresh()
+    window.addEventListener(PENDING_CASES_EVENT, refresh)
+    window.addEventListener("online", refresh)
+    return () => {
+      cancelled = true
+      window.removeEventListener(PENDING_CASES_EVENT, refresh)
+      window.removeEventListener("online", refresh)
+    }
+  }, [])
 
   useEffect(() => {
     if (!isLoading && !user) router.replace("/login")
@@ -70,6 +111,15 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <div className="hidden md:block" />
           <div className="flex items-center gap-1">
+            {!isOnline ? <OfflineBadge /> : null}
+            {pendingCount > 0 ? (
+              <span
+                className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300"
+                title="Cases queued offline — they sync when you are back online"
+              >
+                {pendingCount} pending
+              </span>
+            ) : null}
             <span className="mr-1 hidden rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground sm:inline">
               {roleLabel(user.role)}
             </span>
