@@ -10,7 +10,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { DesktopNav, MobileNav } from "@/components/app-nav"
 import { useAuth } from "@/lib/auth"
 import { authApi } from "@/lib/api"
-import { listPendingCases, PENDING_CASES_EVENT } from "@/lib/offline"
+import { listPendingCases, listPendingUpdates, PENDING_CASES_EVENT } from "@/lib/offline"
 
 function subscribeOnlineStatus(callback: () => void) {
   window.addEventListener("online", callback)
@@ -43,9 +43,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
     const refresh = () => {
-      listPendingCases()
-        .then((items) => {
-          if (!cancelled) setPendingCount(items.length)
+      Promise.all([listPendingCases(), listPendingUpdates()])
+        .then(([cases, updates]) => {
+          if (!cancelled) setPendingCount(cases.length + updates.length)
         })
         .catch(() => {
           if (!cancelled) setPendingCount(0)

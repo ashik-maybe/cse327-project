@@ -1,6 +1,6 @@
 "use client"
 
-import { useDeferredValue, useState } from "react"
+import { useDeferredValue, useEffect, useState } from "react"
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { MagnifyingGlass, Plus, MapPin, CaretLeft, CaretRight } from "@phosphor-icons/react"
@@ -18,6 +18,7 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/states"
 import { CategoryLabel, StatusBadge, UrgencyBadge } from "@/components/case-badges"
 import { useAuth } from "@/lib/auth"
 import { casesApi, type CaseRecord } from "@/lib/api"
+import { listPendingCases, listPendingUpdates, PENDING_CASES_EVENT } from "@/lib/offline"
 
 const PAGE_SIZE = 10
 
@@ -66,6 +67,28 @@ export default function CasesPage() {
   const [urgency, setUrgency] = useState<string>("all")
   const [category, setCategory] = useState<string>("all")
   const [page, setPage] = useState(1)
+  const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    const refresh = () => {
+      Promise.all([listPendingCases(), listPendingUpdates()])
+        .then(([cases, updates]) => {
+          if (!cancelled) setPendingCount(cases.length + updates.length)
+        })
+        .catch(() => {
+          if (!cancelled) setPendingCount(0)
+        })
+    }
+    refresh()
+    window.addEventListener(PENDING_CASES_EVENT, refresh)
+    window.addEventListener("online", refresh)
+    return () => {
+      cancelled = true
+      window.removeEventListener(PENDING_CASES_EVENT, refresh)
+      window.removeEventListener("online", refresh)
+    }
+  }, [])
 
   const deferredQ = useDeferredValue(q)
   const scope = user?.role === "team_lead" ? "team" : "mine"
@@ -102,10 +125,20 @@ export default function CasesPage() {
             {user?.role === "team_lead" ? "Every case across the team." : "Cases you created or were assigned."}
           </p>
         </div>
-        <Button render={<Link href="/cases/new" />}>
-          <Plus data-icon="inline-start" aria-hidden />
-          New case
-        </Button>
+        <div className="flex items-center gap-2">
+          {pendingCount > 0 ? (
+            <span
+              className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300"
+              title="Cases queued offline — they sync when you are back online"
+            >
+              {pendingCount} pending
+            </span>
+          ) : null}
+          <Button render={<Link href="/cases/new" />}>
+            <Plus data-icon="inline-start" aria-hidden />
+            New case
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
