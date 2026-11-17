@@ -1,16 +1,10 @@
 import { dbClient } from "../db/client";
 import { users } from "../db/schema";
 import { eq } from "drizzle-orm";
-import bcrypt from "bcryptjs";
 import { createSession } from "../utils/session";
+import { compare, hash } from "../utils/password";
 
-export function hash(password: string) {
-  return bcrypt.hashSync(password, 10);
-}
-
-export function compare(password: string, passwordHash: string) {
-  return bcrypt.compareSync(password, passwordHash);
-}
+export { hash, compare };
 
 export const register = async (body: {
   name: string;
