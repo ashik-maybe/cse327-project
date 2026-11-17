@@ -1,9 +1,19 @@
 import Dexie, { type Table } from "dexie"
 import type { CreateCaseInput } from "@campbridge/shared"
+import { ApiError, casesApi } from "./api"
 
 export type PendingCase = {
   clientId: string
   body: CreateCaseInput & { clientId: string }
+  createdAt: number
+}
+
+export type CaseUpdatePatch = Partial<CreateCaseInput> & { assignedTo?: string | null }
+
+export type PendingCaseUpdate = {
+  id: string
+  caseId: string
+  patch: CaseUpdatePatch
   createdAt: number
 }
 
@@ -13,10 +23,15 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api"
 
 class OfflineDb extends Dexie {
   pendingCases!: Table<PendingCase, string>
+  pendingUpdates!: Table<PendingCaseUpdate, string>
 
   constructor() {
     super("campbridge")
     this.version(1).stores({ pendingCases: "clientId, createdAt" })
+    this.version(2).stores({
+      pendingCases: "clientId, createdAt",
+      pendingUpdates: "id, caseId, createdAt",
+    })
   }
 }
 
@@ -48,6 +63,37 @@ export async function listPendingCases(): Promise<PendingCase[]> {
 
 export async function removePendingCase(clientId: string): Promise<void> {
   await getDb().pendingCases.delete(clientId)
+  notifyPendingCasesChanged()
+}
+
+function newId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID()
+  }
+  return `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+export async function enqueueCaseUpdate(
+  caseId: string,
+  patch: CaseUpdatePatch
+): Promise<void> {
+  const record: PendingCaseUpdate = {
+    id: newId(),
+    caseId,
+    patch,
+    createdAt: Date.now(),
+  }
+  await getDb().pendingUpdates.put(record)
+  notifyPendingCasesChanged()
+}
+
+export async function listPendingUpdates(): Promise<PendingCaseUpdate[]> {
+  if (typeof window === "undefined") return []
+  return getDb().pendingUpdates.orderBy("createdAt").toArray()
+}
+
+export async function removePendingUpdate(id: string): Promise<void> {
+  await getDb().pendingUpdates.delete(id)
   notifyPendingCasesChanged()
 }
 
@@ -85,6 +131,21 @@ async function doReplayPendingCases(): Promise<{ synced: number; remaining: numb
       synced += 1
     }
   }
-  const remaining = (await listPendingCases()).length
+  const updates = await listPendingUpdates()
+  for (const item of updates) {
+    try {
+      await casesApi.update(item.caseId, item.patch)
+      await removePendingUpdate(item.id)
+      synced += 1
+    } catch (error) {
+      // Network failure — still offline or API unreachable. Keep the queue and
+      // stop replaying; other API errors also keep the item for a later retry.
+      const networkFailure =
+        error instanceof ApiError &&
+        (error.status === 0 || error.code === "NETWORK_ERROR" || error.code === "TIMEOUT")
+      if (networkFailure) break
+    }
+  }
+  const remaining = (await listPendingCases()).length + (await listPendingUpdates()).length
   return { synced, remaining }
 }
