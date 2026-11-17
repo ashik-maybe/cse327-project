@@ -19,6 +19,7 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/states"
 import { CategoryLabel, StatusBadge, UrgencyBadge } from "@/components/case-badges"
 import { useAuth } from "@/lib/auth"
 import { ApiError, casesApi, usersApi } from "@/lib/api"
+import { enqueueCaseUpdate, type CaseUpdatePatch } from "@/lib/offline"
 
 function formatDateTime(value?: string | null) {
   if (!value) return "—"
@@ -60,7 +61,25 @@ export default function CaseDetailPage() {
   })
 
   const assignMutation = useMutation({
-    mutationFn: (assignedTo: string | null) => casesApi.update(id, { assignedTo }),
+    mutationFn: async (assignedTo: string | null) => {
+      const patch: CaseUpdatePatch = { assignedTo }
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await enqueueCaseUpdate(id, patch)
+        return { queued: true as const }
+      }
+      try {
+        return await casesApi.update(id, patch)
+      } catch (error) {
+        const networkFailure =
+          error instanceof ApiError &&
+          (error.status === 0 || error.code === "NETWORK_ERROR" || error.code === "TIMEOUT")
+        if (networkFailure) {
+          await enqueueCaseUpdate(id, patch)
+          return { queued: true as const }
+        }
+        throw error
+      }
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["cases", id] })
       void queryClient.invalidateQueries({ queryKey: ["cases"] })
@@ -69,7 +88,25 @@ export default function CaseDetailPage() {
   })
 
   const statusMutation = useMutation({
-    mutationFn: (status: "new" | "in_progress" | "referred" | "resolved") => casesApi.update(id, { status }),
+    mutationFn: async (status: "new" | "in_progress" | "referred" | "resolved") => {
+      const patch: CaseUpdatePatch = { status }
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await enqueueCaseUpdate(id, patch)
+        return { queued: true as const }
+      }
+      try {
+        return await casesApi.update(id, patch)
+      } catch (error) {
+        const networkFailure =
+          error instanceof ApiError &&
+          (error.status === 0 || error.code === "NETWORK_ERROR" || error.code === "TIMEOUT")
+        if (networkFailure) {
+          await enqueueCaseUpdate(id, patch)
+          return { queued: true as const }
+        }
+        throw error
+      }
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["cases", id] })
       void queryClient.invalidateQueries({ queryKey: ["cases"] })
@@ -149,6 +186,11 @@ export default function CaseDetailPage() {
                   <SelectItem value="resolved">Resolved</SelectItem>
                 </SelectContent>
               </Select>
+              {statusMutation.data && "queued" in statusMutation.data ? (
+                <p className="text-xs font-medium text-amber-700 dark:text-amber-300" role="status">
+                  Queued — will sync when online
+                </p>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -223,6 +265,11 @@ export default function CaseDetailPage() {
                 {assignMutation.isError ? (
                   <p className="text-xs text-destructive" role="alert">
                     {assignMutation.error instanceof Error ? assignMutation.error.message : "Could not assign case."}
+                  </p>
+                ) : null}
+                {assignMutation.data && "queued" in assignMutation.data ? (
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-300" role="status">
+                    Queued — will sync when online
                   </p>
                 ) : null}
               </div>
