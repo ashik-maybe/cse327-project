@@ -22,7 +22,7 @@ export const safetyRoute = new Elysia({ prefix: "/api/safety" })
       approximateLocation: input.approximateLocation,
       urgency: input.urgency,
       occurredAt: input.occurredAt ? new Date(input.occurredAt) : undefined,
-    }, requireUser(user).id);
+    }, requireUser(user));
   }, { body: t.Any() })
   .get("/:id", ({ params, user }: any) => getSafetyReport(params.id, requireUser(user)))
   .patch("/:id", ({ params, body, user }: any) => updateSafetyReportStatus(params.id, updateSafetySchema.parse(body).status, requireUser(user)), {

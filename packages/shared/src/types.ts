@@ -15,7 +15,7 @@ export type SafetyRecord = {
   incidentType: "threat" | "harassment" | "other";
   anonymizedDescription: string;
   originalDescription?: string | null;
-  storeOriginal: boolean;
+  storeOriginal?: boolean;
   approximateLocation?: string | null;
   urgency: "low" | "medium" | "high" | "critical";
   status: "new" | "acknowledged" | "resolved";
