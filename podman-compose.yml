@@ -10,5 +10,27 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+  api:
+    build:
+      context: .
+      dockerfile: apps/backend/Containerfile
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: postgres://campbridge:campbridge@db:5432/campbridge
+      PORT: "4000"
+      SESSION_SECRET: change_this_in_production
+      CORS_ORIGIN: http://localhost:3000
+      AUTH_COOKIE_NAME: campbridge_session
+    depends_on:
+      - db
+  web:
+    build:
+      context: .
+      dockerfile: apps/frontend/Containerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
 volumes:
   db_data:

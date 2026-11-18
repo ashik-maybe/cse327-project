@@ -1,7 +1,22 @@
 FROM oven/bun:latest
 WORKDIR /app
-COPY package.json bunfig.toml ./
+
+# Workspace-aware install: root manifest + lockfile + shared package + backend.
+COPY package.json bun.lock ./
+COPY packages/shared ./packages/shared
+COPY apps/frontend/package.json ./apps/frontend/
+COPY apps/backend ./apps/backend
+
 RUN bun install --frozen-lockfile
-COPY . .
+
+WORKDIR /app/apps/backend
+
+ENV DATABASE_URL=postgres://campbridge:campbridge@db:5432/campbridge \
+    PORT=4000 \
+    SESSION_SECRET=change_this_in_production \
+    CORS_ORIGIN=http://localhost:3000 \
+    AUTH_COOKIE_NAME=campbridge_session
+
 EXPOSE 4000
-CMD ["bun", "run", "dev"]
+
+CMD ["sh", "-c", "bun db:migrate && bun src/index.ts"]
