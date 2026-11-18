@@ -10,6 +10,12 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campbridge -d campbridge"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
   api:
     build:
       context: .
@@ -23,7 +29,9 @@ services:
       CORS_ORIGIN: http://localhost:3000
       AUTH_COOKIE_NAME: campbridge_session
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    restart: unless-stopped
   web:
     build:
       context: .
@@ -32,5 +40,6 @@ services:
       - "3000:3000"
     depends_on:
       - api
+    restart: unless-stopped
 volumes:
   db_data:
